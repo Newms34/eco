@@ -1,0 +1,52 @@
+html,body{
+	width:100%;
+	height:100%;
+	margin:0;
+	background-color: #000;
+}
+#graph{
+	width:20vw;
+	height:40vh;
+	position:fixed;
+	left:0px;
+	top:0px;
+	background-color:rgba(100,100,100,.5);
+	padding:10px;
+}
+.bar{
+	position:relative;
+	background-color: #ccf;
+	border:2px outset #ccf;
+	height:20%;
+	width:20%;
+	display:inline-block;
+}
+.beastie{
+	position:absolute;
+	width:20px;
+	height:20px;
+	font-size:large;
+	text-shadow:none;
+	animation:none;
+	-webkit-animation:none;
+}
+
+
+
+@keyframes mateBurst {
+	0% {box-shadow:0 0 0px 0px #00BE00;}
+	100% {box-shadow:0 0 50px 20px #00BE00;}
+}
+@-webkit-keyframes mateBurst {
+	0% {box-shadow:0 0 0px 0px #00BE00;}
+	100% {box-shadow:0 0 50px 20px #00BE00;}
+}
+
+@keyframes preyBurst {
+	0% {box-shadow:0 0 0px 0px #c00;}
+	100% {box-shadow:0 0 50px 20px #c00;}
+}
+@-webkit-keyframes preyBurst {
+	0% {box-shadow:0 0 0px #c00;}
+	100% {box-shadow:0 0 50px 20px #c00;}
+}
