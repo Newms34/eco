@@ -31,7 +31,20 @@ html,body{
 	-webkit-animation:none;
 }
 
-
+/*HP stuffs*/
+.barFull{
+    width:18px;
+	height:4px;
+    padding:1px;
+    background-color:#555;   
+}
+.barInner{
+    width:100%;
+	height:2px;
+    position:relative;
+    top:1px;
+    background-color:#d00;   
+}
 
 @keyframes mateBurst {
 	0% {box-shadow:0 0 0px 0px #00BE00;}

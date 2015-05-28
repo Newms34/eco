@@ -4,14 +4,16 @@ var numOrgs = {
     'omnivore': 0,
     'carnivore': 0
 };
-var allOrgs = [];
-var t;
+var allOrgs = []; //collection of organism objects, with relevent data
+var allRefs = []; //JUST the references. This gets shuffled; allOrgs does NOT.
+var t; //timer var. Cleared when we 'fail'
 var plantReproSuccess = .99; //lower for more plant spawns, raise for fewer plant spawns
 var maxOrgs = 300; //raise if you have a good computer!
 var orgFullHp = 500; //raise for more 'long-lasting' organisms
 var numFrames = 0; //For reporting when ecosystem 'fails'.
 var winWidth = $(window).innerWidth() - 20;
 var winHeight = $(window).innerHeight() - 20;
+var seasNum = 0;
 for (var key in numOrgs) {
     if (numOrgs.hasOwnProperty(key)) {
         while (numIn == undefined || isNaN(numIn)) {
@@ -24,19 +26,115 @@ for (var key in numOrgs) {
 }
 
 var org = function(id, type, x, y, dx, dy) {
-    this.id = id
-    this.x = x;
-    this.y = y;
-    this.dx = dx;
-    this.dy = dy;
-    this.type = type;
+    this.id = id; //the organism's id. combo of its 'species' and a unique identifying number
+    this.x = x; //org's position x
+    this.y = y; //org's position y
+    this.dx = dx; //org's current direction x
+    this.dy = dy; //org's current direction y
+    this.type = type; //org type. same as first part of id 
     var hpRange = (1.2 * orgFullHp) - (0.8 * orgFullHp);
     var hp = (0.8 * orgFullHp) + (Math.random() * hpRange)
     this.hp = Math.floor(hp);
-    this.tillRepo = 0;
-    this.tillInter = 0;
+    this.maxHp = Math.floor(hp); //this one does not get changed. It provides a percent 'base' for the hp-bar fn
+    this.reproChance = 0.2; //chance each time the target changes that this is gonna mate
+    this.age; //what frame this was created at
+    this.state = 'mate';
+    var randState = Math.random();
+    if (randState < .33) {
+        this.state = 'rand';
+    } else if (randState < .67) {
+        this.state = 'pred';
+    }
+    this.currTarg; //organism's target. If rand or just 'hit' previous targ, null. Otherwise, a number representing another organism (in allOrgs list)
+    this.spd; //if predator, 1.5. Otherwise, 1. This prevents infinite chases
 }
 
+var distCalc = function(one, two) {
+    //help fn to calculate distance between two orgs
+    //this is used to see if the targ is still within the visible 'range'.
+    var x1 = allOrgs[one].x;
+    var x2 = allOrgs[two].x;
+    var y1 = allOrgs[one].y;
+    var y2 = allOrgs[two].y;
+    var dist = Math.sqrt(Math.pow((x2 - x1), 2) + Math.pow((y2 - y1), 2));
+    return dist;
+}
+
+var changeMode = function(org) {
+    var oldState = allOrgs[org].state;
+    // while (allOrgs[org].state == oldState) {
+    //keep running until we get a state that's different from the one we just did.
+    var randState = Math.random();
+    if (randState < .33) {
+        allOrgs[org].state = 'rand';
+    } else if (randState < .67) {
+        allOrgs[org].state = 'pred';
+    } else {
+        allOrgs[org].state = 'mate';
+    }
+    // }
+}
+
+var targSearch = function(srcOrg, mode) {
+    //find a relevent target!
+    var notVis = true; //default visibility to no
+    var targOrg = 0; //default target org to 0
+    var visDist = ($(document).width()) / 2;
+    var goodTarg = false; //checks to see if it's a relavent target, depending on mode
+    changeMode(srcOrg);
+    mode = allOrgs[srcOrg].state;
+    if (mode != 'rand' && allOrgs[srcOrg].type != 'producer') {
+        //not random movement
+        while (srcOrg == targOrg || notVis || !goodTarg) {
+            targOrg = Math.floor(Math.random() * allOrgs.length); //pick a random target
+            if (distCalc(srcOrg, targOrg) < visDist) {
+                //target in range
+                notVis = false;
+            } else {
+                //target not in range;
+                notVis = true;
+            }
+            goodTarg = false; //default back to bad targ
+            if (mode == 'pred') {
+                //determine if this is a relevent target for predation
+                //note that for the sake of this sim, omnivores prey ONLY on herbivores, not on carnivores
+                if (allOrgs[srcOrg].type == 'herbivore' && allOrgs[targOrg].type == 'producer') {
+                    goodTarg = true;
+                } else if (allOrgs[srcOrg].type == 'omnivore' && (allOrgs[targOrg].type == 'herbivore' || allOrgs[targOrg].type == 'producer')) {
+                    goodTarg = true;
+                } else if (allOrgs[srcOrg].type == 'carnivore' && (allOrgs[targOrg].type == 'herbivore' || allOrgs[targOrg].type == 'omnivore')) {
+                    goodTarg = true;
+                }
+            } else {
+                //determine if this is a relevent target for mate
+                if (allOrgs[targOrg].type == allOrgs[srcOrg].type) {
+                    goodTarg = true;
+                }
+            }
+        }
+        allOrgs[srcOrg].currTarg = targOrg; //finally, once we've found a target, set that!
+    }
+}
+
+var statsUpd = function(srcOrg) {
+    //update health bar on organism;
+    var hpPerc = Math.ceil(allOrgs[srcOrg].hp * 100 / allOrgs[srcOrg].maxHp);
+    var hpId = allOrgs[srcOrg].id+'bar';
+    $('#'+hpId).css('width', hpPerc + '%');
+}
+
+Array.prototype.randOrgs = function() {
+    //another helper function. This simply shuffles all orgs according to the fisher-price algorithm or something.
+    var i = this.length,
+        j, temp;
+    if (i == 0) return;
+    while (--i) {
+        j = Math.floor(Math.random() * (i + 1));
+        temp = this[i];
+        this[i] = this[j];
+        this[j] = temp;
+    }
+};
 
 var generate = function() {
     //initialize
@@ -47,77 +145,110 @@ var generate = function() {
             }
         }
     }
-    //now start the timer of DEAAAATH
+    //populate reference arr
+    for (var q = 0; q < allOrgs.length; q++) {
+        allRefs.push(i);
+        targSearch(q, allOrgs[q].state);
+    }
+    //now start the timer
     t = setInterval(function() {
         render();
     }, 40)
 }
+
 var newOrg = function(key, i) {
     var el = document.createElement('div');
     el.className = 'beastie';
     var id = key + i;
     el.id = id;
-    var x = Math.floor(Math.random() * winWidth) + 'px';
-    var y = Math.floor(Math.random() * winHeight) + 'px'
-    el.style.left = x;
-    el.style.top = y;
+    var x = Math.floor(Math.random() * winWidth);
+    var y = Math.floor(Math.random() * winHeight);
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
     if (key == 'producer') {
-        el.innerHTML = '\uD83C\uDF32';
+        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83C\uDF32';
     } else if (key == 'herbivore') {
-        el.innerHTML = '\uD83D\uDC04';
+        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83D\uDC04';
     } else if (key == 'omnivore') {
-        el.innerHTML = '\uD83D\uDC16';
+        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83D\uDC16';
     } else {
-        el.innerHTML = '\uD83D\uDC15';
+        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83D\uDC15';
     }
     $('#playingField').append(el);
     var xDir = (Math.random() > .5) ? 1 : -1;
     var yDir = (Math.random() > .5) ? 1 : -1;
     allOrgs.push(new org(id, key, x, y, xDir, yDir))
-
 }
-generate();
+generate(); //create the playing 'field'. runs once at start.
+
 var frameDif = 0;
+var moveFn = function(orgNum) {
+    if (allOrgs[orgNum].state == 'rand') {
+        //random movement
+        var chanceFlipX = Math.random();
+        if (chanceFlipX > .97) {
+            allOrgs[orgNum].dx *= -1;
+        }
+        //then yflip chance;
+        var chanceFlipY = Math.random();
+        if (chanceFlipY > .97) {
+            allOrgs[orgNum].dy *= -1;
+        }
+        //now border detection: x
+        if ((allOrgs[orgNum].x > (winWidth - 10) && allOrgs[orgNum].dx == 1) || (allOrgs[orgNum].x < 10 && allOrgs[orgNum].dx == -1)) {
+            allOrgs[orgNum].dx *= -1;
+        }
+        //and y
+        if ((allOrgs[orgNum].y > (winHeight - 10) && allOrgs[orgNum].dy == 1) || (allOrgs[orgNum].y < 10 && allOrgs[orgNum].dy == -1)) {
+            allOrgs[orgNum].dx *= -1;
+        }
+    } else {
+        //org has a target, so find that
+        //note that orgs with a target get 1.5 speed instead of 1.0
+        var theTarg = allOrgs[orgNum].currTarg;
+        console.log('Target:', theTarg)
+        if (allOrgs[orgNum].x < allOrgs[theTarg].x) {
+            allOrgs[orgNum].dx = 1.5;
+        } else {
+            allOrgs[orgNum].dx = -1.5;
+        }
+
+        if (allOrgs[orgNum].y < allOrgs[theTarg].y) {
+            allOrgs[orgNum].dy = 1.5;
+        } else {
+            allOrgs[orgNum].dy = -1.5;
+        }
+    }
+}
+
 var render = function() {
     var timeStart = new Date().getTime();
-    //render new positions of each element
+    //render new positions of each element. This is the main frame fn
     for (var i = 0; i < allOrgs.length; i++) {
         if (allOrgs[i].type != 'producer') {
-            //first, xflip chance
-            var chanceFlipX = Math.random();
-            if (chanceFlipX > .97) {
-                allOrgs[i].dx *= -1;
-            }
-            //then yflip chance;
-            var chanceFlipY = Math.random();
-            if (chanceFlipY > .97) {
-                allOrgs[i].dy *= -1;
-            }
-            //now border detection: x
-            if ((allOrgs[i].x > (winWidth - 10) && allOrgs[i].dx == 1) || (allOrgs[i].x < 10 && allOrgs[i].dx == -1)) {
-                allOrgs[i].dx *= -1;
-            }
-            //and y
-            if ((allOrgs[i].y > (winHeight - 10) && allOrgs[i].dy == 1) || (allOrgs[i].y < 10 && allOrgs[i].dy == -1)) {
-                allOrgs[i].dx *= -1;
-            }
+            //not a plant
+            moveFn(i);
+            interact(i);
             allOrgs[i].x = parseInt(allOrgs[i].x) + parseInt(allOrgs[i].dx);
             allOrgs[i].y = parseInt(allOrgs[i].y) + parseInt(allOrgs[i].dy);
             $('#' + allOrgs[i].id).css({
                 'left': allOrgs[i].x + 'px',
                 'top': allOrgs[i].y + 'px'
             });
+
         }
     }
-    //now do interactions
-    interact();
     graphDraw();
     numFrames++;
+
+    //temporary frame-time calc
     var timeEnd = new Date().getTime();
     if (frameDif < (timeEnd - timeStart)) {
         frameDif = timeEnd - timeStart;
         console.log('Time for one frame: ' + frameDif + 'ms')
     }
+
+    //fail conditions
     if (numOrgs['producer'] < 1) {
         clearInterval(t);
         alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more producers!')
@@ -132,88 +263,16 @@ var render = function() {
         alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more carnivores!')
     }
 }
-var interact = function() {
-    for (var i = 0; i < allOrgs.length; i++) {
-        if (allOrgs[i].type == 'producer') {
-            //plant, so reproduce w/out interaction
-            //note that plants can eb interacted WITH, they just cant INITIATE an interaction
-            var plantReproChance = Math.random();
-            if (plantReproChance > plantReproSuccess && allOrgs[i].tillRepo < 1 && allOrgs.length < maxOrgs) {
-                //plant haz a bebee!
-                //make new plant
-                newOrg('producer', numOrgs['producer']);
-                //increment num plants by 1
-                numOrgs['producer'] += 1;
-                //set so plant cannot immediately reproduce
-                allOrgs[i].tillRepo = 50;
-                $('#' + allOrgs[i].id).css({
-                    'animation': 'none',
-                    '-webkit-animation': 'none'
-                });
-                $('#' + allOrgs[i].id).css({
-                    'animation': 'mateBurst 1s linear',
-                    '-webkit-animation': 'mateBurst 1s linear'
-                });
-            }
-        } else {
-            //not a plant, so continue with second loop
-            for (var j = 0; j < allOrgs.length; j++) {
-                /*i = first organism
-                j = second organism
-                INTERACTION TYPES:
-                1) None: P+C. (any others?...)
-                2) Predation: C+H, C+O, O+C,H+C
-                3) Grazing: H+P, P+H, O+P, P+O. for now, functionally the same as '2'
-                4) Mating: H+H, O+O, C+C
-                */
-                var difX = Math.abs(allOrgs[i].x - allOrgs[j].x);
-                var difY = Math.abs(allOrgs[i].y - allOrgs[j].y);
-                if (difX < 15 && difY < 15 && allOrgs[i].tillInter < 1 && allOrgs[j].tillInter < 1 && i != j) {
-                    //collision
-                    if (allOrgs[i].type == 'carnivore' && allOrgs[j].type == 'producer') {
-                        //do nothing. carnivore/producer interaction
-                    } else if (allOrgs[i].type == allOrgs[j].type) {
-                        //m8
-                        mateFn(i, j);
-                    } else if ((allOrgs[i].type == 'herbivore' && allOrgs[j].type == 'carnivore') || (allOrgs[i].type == 'herbivore' && allOrgs[j].type == 'omnivore') || (allOrgs[i].type == 'omnivore' && allOrgs[j].type == 'carnivore')) {
-                        //j preying on i
-                        predFn(j, i);
-                    } else if ((allOrgs[i].type == 'herbivore' && allOrgs[j].type == 'producer') || (allOrgs[i].type == 'omnivore' && allOrgs[j].type == 'producer') || (allOrgs[i].type == 'carnivore' && allOrgs[j].type == 'herbivore') || (allOrgs[i].type == 'omnivore' && allOrgs[j].type == 'herbivore') || (allOrgs[i].type == 'carnivore' && allOrgs[j].type == 'omnivore')) {
-                        //i preying on j
-                        predFn(i, j);
-                    }
-                    if (allOrgs[j].type == 'producer' && (allOrgs[i].type == 'herbivore' || allOrgs[i].type == 'omnivore')) {
-                        //plants can be 'eaten' more often
-                        allOrgs[i].tillInter = 10;
-                        allOrgs[j].tillInter = 10;
-                    } else {
-                        allOrgs[i].tillInter = 50;
-                        allOrgs[j].tillInter = 50;
-                    }
-                }
-            }
-        }
-        if (allOrgs[i].tillRepo > 0) {
-            allOrgs[i].tillRepo--;
-        }
-        if (allOrgs[i].tillInter > 0) {
-            allOrgs[i].tillInter--;
-        }
-        allOrgs[i].hp--;
-        if (allOrgs[i].hp < 1) {
-            dieFn(i);
-        }
-    }
-}
+
 var mateFn = function(first, second) {
-    if (Math.random() > 0.89 && allOrgs[first].tillRepo < 1 && allOrgs[second].tillRepo < 1 && allOrgs.length < maxOrgs) {
+    if (Math.random() > 0.89 && allOrgs[first].tillRepro < 1 && allOrgs[second].tillRepro < 1 && allOrgs.length < maxOrgs) {
         //so we dont mate every time
         newOrg(allOrgs[first].type, numOrgs[allOrgs[first].type]);
         //increment num this type by 1
         numOrgs[allOrgs[first].type] += 1;
         //set so org cannot immediately reproduce
-        allOrgs[first].tillRepo = 50;
-        allOrgs[second].tillRepo = 50;
+        allOrgs[first].tillRepro = 50;
+        allOrgs[second].tillRepro = 50;
         console.log(allOrgs[first].type + first + ' mated!');
         $('#' + allOrgs[first].id).css({
             'animation': 'none',
@@ -223,11 +282,15 @@ var mateFn = function(first, second) {
             'animation': 'mateBurst 1s linear',
             '-webkit-animation': 'mateBurst 1s linear'
         });
+    } else {
+        //friendzoned. pick new targ
+        targSearch(first, allOrgs[first].state);
     }
 }
+
 var predFn = function(predator, prey) {
-    if (Math.random() > 0.5) {
-        //predation! FATALITY!
+    if (Math.random() > 0.3) {
+        //predation! FATALITY! note this has a chance to fail
         $('#' + allOrgs[prey].id).remove();
         numOrgs[allOrgs[prey].type] -= 1;
         allOrgs.splice(prey, 1); //remove prey from allOrgs list, since it 'died'
@@ -239,7 +302,10 @@ var predFn = function(predator, prey) {
             'animation': 'preyBurst 1s linear',
             '-webkit-animation': 'preyBurst 1s linear'
         });
-        allOrgs[predator].hp = orgFullHp; //tasty snaks
+        allOrgs[predator].hp = allOrgs[predator].maxHp; //organism 'recharges' its hp bar
+    } else {
+        //predation failed. pick new targ
+        targSearch(predator, allOrgs[predator].state)
     }
 }
 
@@ -249,7 +315,14 @@ var dieFn = function(toDie) {
     $('#' + allOrgs[toDie].id).remove();
     numOrgs[allOrgs[toDie].type] -= 1;
     allOrgs.splice(toDie, 1); //remove victim from allOrgs list, since it 'died'
+    for (var n=0;n<allOrgs.length;n++){
+        if (allOrgs[n].currTarg && allOrgs[n].currTarg == toDie){
+            //check to see if anyone else was seeking this
+            targSearch(n, allOrgs[n].state);
+        }
+    }
 }
+
 var graphDraw = function() {
     var total = allOrgs.length
     var percProd = Math.floor((numOrgs['producer'] / total) * 95);
@@ -262,9 +335,30 @@ var graphDraw = function() {
     $('#carniGraph').css('width', percCarn + '%');
 }
 
-/*TO ADD:
--Do something with hp. Perhaps if herbivore+ has not eaten in x turns, chance for starvation death?
-    -can we do an alternative for plants, since they don't 'feed'?
--Handle overpopulations?
-if one type has 0 members, clearInterval(t), report ('ecosystem destabilized!'), report num frames?
+var interact = function(orgInt) {
+    if (allOrgs[orgInt].currTarg) {
+        var targInt = allOrgs[orgInt].currTarg;
+        console.log(allOrgs[orgInt].currTarg)
+
+        var xDiff = Math.abs(allOrgs[orgInt].x - allOrgs[targInt].x);
+        var yDiff = Math.abs(allOrgs[orgInt].y - allOrgs[targInt].y);
+        if (xDiff < 10 && yDiff < 10) {
+            if (allOrgs[orgInt].state == 'pred') {
+                predFn(orgInt, targInt);
+            } else if (allOrgs[orgInt].state == 'mate') {
+                mateFn(orgInt, targInt);
+            }
+        }
+    }
+    allOrgs[orgInt].hp--;
+    statsUpd(orgInt);
+    if (allOrgs[orgInt].hp==0){
+        dieFn(orgInt);
+    }
+}
+
+/*
+CURRENT ISSUES:
+As it stands, this should create a 'black hole' effect in the center of the screen, because all orgs will 'seek' other orgs.
+
 */
