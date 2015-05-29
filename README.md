@@ -1,7 +1,4 @@
 #Ecology Simulation
-##Contents
-
-#Ecology Simulation
 >Some exploration of basic concepts in ecology, including food web balance!
 
 ## Contents
