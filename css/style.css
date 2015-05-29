@@ -3,6 +3,7 @@ html,body{
 	height:100%;
 	margin:0;
 	background-color: #000;
+	color:#fff;
 }
 #graph{
 	width:20vw;
@@ -29,6 +30,12 @@ html,body{
 	text-shadow:none;
 	animation:none;
 	-webkit-animation:none;
+}
+.skrHi{
+	background-color: #ccf;
+}
+.skeHi{
+	background-color: #fcf;
 }
 
 /*HP stuffs*/

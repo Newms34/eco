@@ -7,7 +7,7 @@ var numOrgs = {
 var allOrgs = []; //collection of organism objects, with relevent data
 var allRefs = []; //JUST the references. This gets shuffled; allOrgs does NOT.
 var t; //timer var. Cleared when we 'fail'
-var plantReproSuccess = .99; //lower for more plant spawns, raise for fewer plant spawns
+var plantReproSuccess = 0.99; //lower for more plant spawns, raise for fewer plant spawns
 var maxOrgs = 300; //raise if you have a good computer!
 var orgFullHp = 500; //raise for more 'long-lasting' organisms
 var numFrames = 0; //For reporting when ecosystem 'fails'.
@@ -16,10 +16,9 @@ var winHeight = $(window).innerHeight() - 20;
 var seasNum = 0;
 for (var key in numOrgs) {
     if (numOrgs.hasOwnProperty(key)) {
-        while (numIn == undefined || isNaN(numIn)) {
-            var numIn = parseInt(prompt('How many ' + key + 's does your habitat have?', ''));
+        while (numIn === undefined || isNaN(numIn)) {
+            var numIn = parseInt(prompt('How many ' + key + 's does your habitat have?', ''), 10);
         }
-        console.log(numIn);
         numOrgs[key] = numIn;
     }
     numIn = undefined;
@@ -33,21 +32,20 @@ var org = function(id, type, x, y, dx, dy) {
     this.dy = dy; //org's current direction y
     this.type = type; //org type. same as first part of id 
     var hpRange = (1.2 * orgFullHp) - (0.8 * orgFullHp);
-    var hp = (0.8 * orgFullHp) + (Math.random() * hpRange)
+    var hp = (0.8 * orgFullHp) + (Math.random() * hpRange);
     this.hp = Math.floor(hp);
     this.maxHp = Math.floor(hp); //this one does not get changed. It provides a percent 'base' for the hp-bar fn
     this.reproChance = 0.2; //chance each time the target changes that this is gonna mate
-    this.age; //what frame this was created at
+    this.age = numFrames; //what frame this was created at
     this.state = 'mate';
     var randState = Math.random();
-    if (randState < .33) {
+    if (randState < 0.33) {
         this.state = 'rand';
-    } else if (randState < .67) {
+    } else if (randState < 0.67) {
         this.state = 'pred';
     }
-    this.currTarg; //organism's target. If rand or just 'hit' previous targ, null. Otherwise, a number representing another organism (in allOrgs list)
-    this.spd; //if predator, 1.5. Otherwise, 1. This prevents infinite chases
-}
+    this.currTarg = 0; //organism's target. If rand or just 'hit' previous targ, null. Otherwise, a number representing another organism (in allOrgs list)
+};
 
 var distCalc = function(one, two) {
     //help fn to calculate distance between two orgs
@@ -58,22 +56,22 @@ var distCalc = function(one, two) {
     var y2 = allOrgs[two].y;
     var dist = Math.sqrt(Math.pow((x2 - x1), 2) + Math.pow((y2 - y1), 2));
     return dist;
-}
+};
 
 var changeMode = function(org) {
     var oldState = allOrgs[org].state;
     // while (allOrgs[org].state == oldState) {
     //keep running until we get a state that's different from the one we just did.
     var randState = Math.random();
-    if (randState < .33) {
-        allOrgs[org].state = 'rand';
-    } else if (randState < .67) {
+    if (randState < 0.375) {
         allOrgs[org].state = 'pred';
-    } else {
+    } else if (randState < 0.75) {
         allOrgs[org].state = 'mate';
+    } else {
+        allOrgs[org].state = 'rand';
     }
     // }
-}
+};
 
 var targSearch = function(srcOrg, mode) {
     //find a relevent target!
@@ -114,20 +112,20 @@ var targSearch = function(srcOrg, mode) {
         }
         allOrgs[srcOrg].currTarg = targOrg; //finally, once we've found a target, set that!
     }
-}
+};
 
 var statsUpd = function(srcOrg) {
     //update health bar on organism;
     var hpPerc = Math.ceil(allOrgs[srcOrg].hp * 100 / allOrgs[srcOrg].maxHp);
-    var hpId = allOrgs[srcOrg].id+'bar';
-    $('#'+hpId).css('width', hpPerc + '%');
-}
+    var hpId = allOrgs[srcOrg].id + 'bar';
+    $('#' + hpId).css('width', hpPerc + '%');
+};
 
 Array.prototype.randOrgs = function() {
     //another helper function. This simply shuffles all orgs according to the fisher-price algorithm or something.
     var i = this.length,
         j, temp;
-    if (i == 0) return;
+    if (i === 0) return;
     while (--i) {
         j = Math.floor(Math.random() * (i + 1));
         temp = this[i];
@@ -147,14 +145,30 @@ var generate = function() {
     }
     //populate reference arr
     for (var q = 0; q < allOrgs.length; q++) {
-        allRefs.push(i);
+        allRefs.push(q);
         targSearch(q, allOrgs[q].state);
     }
     //now start the timer
     t = setInterval(function() {
         render();
-    }, 40)
-}
+    }, 40);
+};
+
+var showInt = function(showNum, seekMode) {
+    //function highlights this organism and its 'target'
+    var seeker = allOrgs[showNum].id;
+    var seekee = allOrgs[allOrgs[showNum].currTarg].id;
+    console.log('Targets: ', seeker, seekee)
+    if (seekMode) {
+        $('#' + seeker).addClass('skrHi');
+        $('#' + seekee).addClass('skeHi');
+    } else {
+        for (var i = 0; i < allOrgs.length; i++) {
+            $('#' + allOrgs[i].id).removeClass('skrHi', 'skeHi');
+            $('#' + allOrgs[i].id).removeClass('skrHi', 'skeHi');
+        }
+    }
+};
 
 var newOrg = function(key, i) {
     var el = document.createElement('div');
@@ -166,19 +180,26 @@ var newOrg = function(key, i) {
     el.style.left = x + 'px';
     el.style.top = y + 'px';
     if (key == 'producer') {
-        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83C\uDF32';
+        el.innerHTML = '<div class="barFull"><div id="' + id + 'bar" class="barInner"></div></div>\uD83C\uDF32';
     } else if (key == 'herbivore') {
-        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83D\uDC04';
+        el.innerHTML = '<div class="barFull"><div id="' + id + 'bar" class="barInner"></div></div>\uD83D\uDC04';
     } else if (key == 'omnivore') {
-        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83D\uDC16';
+        el.innerHTML = '<div class="barFull"><div id="' + id + 'bar" class="barInner"></div></div>\uD83D\uDC16';
     } else {
-        el.innerHTML = '<div class="barFull"><div id="'+id+'bar" class="barInner"></div></div>\uD83D\uDC15';
+        el.innerHTML = '<div class="barFull"><div id="' + id + 'bar" class="barInner"></div></div>\uD83D\uDC15';
     }
+    var xDir = (Math.random() > 0.5) ? 1 : -1;
+    var yDir = (Math.random() > 0.5) ? 1 : -1;
+    var whichOrg = allOrgs.length;
+    allOrgs.push(new org(id, key, x, y, xDir, yDir));
+    el.onmouseout = function() {
+        showInt(whichOrg, 0)
+    };
+    el.onmouseover = function() {
+        showInt(whichOrg, 1)
+    };
     $('#playingField').append(el);
-    var xDir = (Math.random() > .5) ? 1 : -1;
-    var yDir = (Math.random() > .5) ? 1 : -1;
-    allOrgs.push(new org(id, key, x, y, xDir, yDir))
-}
+};
 generate(); //create the playing 'field'. runs once at start.
 
 var frameDif = 0;
@@ -186,12 +207,12 @@ var moveFn = function(orgNum) {
     if (allOrgs[orgNum].state == 'rand') {
         //random movement
         var chanceFlipX = Math.random();
-        if (chanceFlipX > .97) {
+        if (chanceFlipX > 0.97) {
             allOrgs[orgNum].dx *= -1;
         }
         //then yflip chance;
         var chanceFlipY = Math.random();
-        if (chanceFlipY > .97) {
+        if (chanceFlipY > 0.97) {
             allOrgs[orgNum].dy *= -1;
         }
         //now border detection: x
@@ -202,11 +223,11 @@ var moveFn = function(orgNum) {
         if ((allOrgs[orgNum].y > (winHeight - 10) && allOrgs[orgNum].dy == 1) || (allOrgs[orgNum].y < 10 && allOrgs[orgNum].dy == -1)) {
             allOrgs[orgNum].dx *= -1;
         }
-    } else {
+    } else if (allOrgs[orgNum].currTarg && allOrgs[orgNum].currTarg < allOrgs.length) {
         //org has a target, so find that
         //note that orgs with a target get 1.5 speed instead of 1.0
         var theTarg = allOrgs[orgNum].currTarg;
-        console.log('Target:', theTarg)
+        console.log(typeof theTarg)
         if (allOrgs[orgNum].x < allOrgs[theTarg].x) {
             allOrgs[orgNum].dx = 1.5;
         } else {
@@ -219,7 +240,7 @@ var moveFn = function(orgNum) {
             allOrgs[orgNum].dy = -1.5;
         }
     }
-}
+};
 
 var render = function() {
     var timeStart = new Date().getTime();
@@ -229,8 +250,8 @@ var render = function() {
             //not a plant
             moveFn(i);
             interact(i);
-            allOrgs[i].x = parseInt(allOrgs[i].x) + parseInt(allOrgs[i].dx);
-            allOrgs[i].y = parseInt(allOrgs[i].y) + parseInt(allOrgs[i].dy);
+            allOrgs[i].x = parseInt(allOrgs[i].x, 10) + parseInt(allOrgs[i].dx, 10);
+            allOrgs[i].y = parseInt(allOrgs[i].y, 10) + parseInt(allOrgs[i].dy, 10);
             $('#' + allOrgs[i].id).css({
                 'left': allOrgs[i].x + 'px',
                 'top': allOrgs[i].y + 'px'
@@ -245,34 +266,32 @@ var render = function() {
     var timeEnd = new Date().getTime();
     if (frameDif < (timeEnd - timeStart)) {
         frameDif = timeEnd - timeStart;
-        console.log('Time for one frame: ' + frameDif + 'ms')
+        console.log('Time for one frame: ' + frameDif + 'ms');
     }
 
     //fail conditions
-    if (numOrgs['producer'] < 1) {
+    if (numOrgs.producer < 1) {
         clearInterval(t);
-        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more producers!')
-    } else if (numOrgs['herbivore'] < 1) {
+        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more producers!');
+    } else if (numOrgs.herbivore < 1) {
         clearInterval(t);
-        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more herbivores!')
-    } else if (numOrgs['omnivore'] < 1) {
+        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more herbivores!');
+    } else if (numOrgs.omnivore < 1) {
         clearInterval(t);
-        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more omnivores!')
-    } else if (numOrgs['carnivore'] < 1) {
+        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more omnivores!');
+    } else if (numOrgs.carnivore < 1) {
         clearInterval(t);
-        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more carnivores!')
+        alert('Your ecosystem destabilized after ' + numFrames + ' frames: There are no more carnivores!');
     }
-}
+};
 
 var mateFn = function(first, second) {
-    if (Math.random() > 0.89 && allOrgs[first].tillRepro < 1 && allOrgs[second].tillRepro < 1 && allOrgs.length < maxOrgs) {
+    if (Math.random() > 0.3 && allOrgs.length < maxOrgs) {
         //so we dont mate every time
         newOrg(allOrgs[first].type, numOrgs[allOrgs[first].type]);
         //increment num this type by 1
         numOrgs[allOrgs[first].type] += 1;
         //set so org cannot immediately reproduce
-        allOrgs[first].tillRepro = 50;
-        allOrgs[second].tillRepro = 50;
         console.log(allOrgs[first].type + first + ' mated!');
         $('#' + allOrgs[first].id).css({
             'animation': 'none',
@@ -282,14 +301,13 @@ var mateFn = function(first, second) {
             'animation': 'mateBurst 1s linear',
             '-webkit-animation': 'mateBurst 1s linear'
         });
-    } else {
-        //friendzoned. pick new targ
-        targSearch(first, allOrgs[first].state);
+        $(body).css('background-color', '#fcc')
     }
-}
+    targSearch(first, allOrgs[first].state);
+};
 
 var predFn = function(predator, prey) {
-    if (Math.random() > 0.3) {
+    if (Math.random() > 0.5) {
         //predation! FATALITY! note this has a chance to fail
         $('#' + allOrgs[prey].id).remove();
         numOrgs[allOrgs[prey].type] -= 1;
@@ -303,11 +321,12 @@ var predFn = function(predator, prey) {
             '-webkit-animation': 'preyBurst 1s linear'
         });
         allOrgs[predator].hp = allOrgs[predator].maxHp; //organism 'recharges' its hp bar
+        adjustTargs[prey]; //adjust target for any that were also 'seeking' this.
     } else {
         //predation failed. pick new targ
-        targSearch(predator, allOrgs[predator].state)
+        targSearch(predator, allOrgs[predator].state);
     }
-}
+};
 
 var dieFn = function(toDie) {
     //starvation
@@ -315,34 +334,28 @@ var dieFn = function(toDie) {
     $('#' + allOrgs[toDie].id).remove();
     numOrgs[allOrgs[toDie].type] -= 1;
     allOrgs.splice(toDie, 1); //remove victim from allOrgs list, since it 'died'
-    for (var n=0;n<allOrgs.length;n++){
-        if (allOrgs[n].currTarg && allOrgs[n].currTarg == toDie){
-            //check to see if anyone else was seeking this
-            targSearch(n, allOrgs[n].state);
-        }
-    }
-}
+    adjustTargs[toDie];
+};
 
 var graphDraw = function() {
-    var total = allOrgs.length
-    var percProd = Math.floor((numOrgs['producer'] / total) * 95);
-    var percHerb = Math.floor((numOrgs['herbivore'] / total) * 95);
-    var percOmni = Math.floor((numOrgs['omnivore'] / total) * 95);
-    var percCarn = Math.floor((numOrgs['carnivore'] / total) * 95);
+    var total = allOrgs.length;
+    var percProd = Math.floor((numOrgs.producer / total) * 95);
+    var percHerb = Math.floor((numOrgs.herbivore / total) * 95);
+    var percOmni = Math.floor((numOrgs.omnivore / total) * 95);
+    var percCarn = Math.floor((numOrgs.carnivore / total) * 95);
     $('#prodGraph').css('width', percProd + '%');
     $('#herbGraph').css('width', percHerb + '%');
     $('#omniGraph').css('width', percOmni + '%');
     $('#carniGraph').css('width', percCarn + '%');
-}
+};
 
 var interact = function(orgInt) {
-    if (allOrgs[orgInt].currTarg) {
+    if (allOrgs[orgInt].currTarg && allOrgs[orgInt].currTarg < allOrgs.length) {
         var targInt = allOrgs[orgInt].currTarg;
-        console.log(allOrgs[orgInt].currTarg)
-
         var xDiff = Math.abs(allOrgs[orgInt].x - allOrgs[targInt].x);
         var yDiff = Math.abs(allOrgs[orgInt].y - allOrgs[targInt].y);
         if (xDiff < 10 && yDiff < 10) {
+            console.log(xDiff, yDiff,allOrgs[orgInt].state);
             if (allOrgs[orgInt].state == 'pred') {
                 predFn(orgInt, targInt);
             } else if (allOrgs[orgInt].state == 'mate') {
@@ -352,13 +365,27 @@ var interact = function(orgInt) {
     }
     allOrgs[orgInt].hp--;
     statsUpd(orgInt);
-    if (allOrgs[orgInt].hp==0){
+    if (allOrgs[orgInt].hp === 0) {
         dieFn(orgInt);
     }
-}
+};
+
+var adjustTargs = function(oldTargNum) {
+    console.log('Called adjustTargs for: ', oldTargNum)
+    for (var m = 0; m < allOrgs.length; m++) {
+        if (allOrgs[m].currTarg > oldTargNum) {
+            //if greater 
+            allOrgs[m].currTarg--;
+        } else if (allOrgs[m].currTarg == oldTargNum) {
+            targSearch(m, allOrgs[m].state);
+        }
+    }
+};
+
 
 /*
 CURRENT ISSUES:
 As it stands, this should create a 'black hole' effect in the center of the screen, because all orgs will 'seek' other orgs.
-
+no reproductions! why?!
+when org dies, we need to shift all RIGHT of that left ONE. 
 */
