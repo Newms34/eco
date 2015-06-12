@@ -233,7 +233,6 @@ var moveFn = function(orgNum) {
         } else {
             allOrgs[orgNum].dx = -1.5;
         }
-
         if (allOrgs[orgNum].y < allOrgs[theTarg].y) {
             allOrgs[orgNum].dy = 1.5;
         } else {
@@ -285,7 +284,7 @@ var render = function() {
     }
 };
 
-var mateFn = function(first, second) {
+var mateFn = function(first, second) {  
     if (Math.random() > 0.3 && allOrgs.length < maxOrgs) {
         //so we dont mate every time
         newOrg(allOrgs[first].type, numOrgs[allOrgs[first].type]);
@@ -331,6 +330,7 @@ var predFn = function(predator, prey) {
 var dieFn = function(toDie) {
     //starvation
     //note that unlike predation and mating, this ALWAYS occurs
+    //if the hp bar reaches 0
     $('#' + allOrgs[toDie].id).remove();
     numOrgs[allOrgs[toDie].type] -= 1;
     allOrgs.splice(toDie, 1); //remove victim from allOrgs list, since it 'died'
