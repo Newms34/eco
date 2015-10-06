@@ -44,7 +44,7 @@ var org = function(id, type, x, y, dx, dy) {
     } else if (randState < 0.67) {
         this.state = 'pred';
     }
-    this.currTarg = 0; //organism's target. If rand or just 'hit' previous targ, null. Otherwise, a number representing another organism (in allOrgs list)
+    this.currTarg = null; //organism's target. If rand or just 'hit' previous targ, null. Otherwise, a number representing another organism (in allOrgs list)
 };
 
 var distCalc = function(one, two) {
@@ -78,7 +78,7 @@ var targSearch = function(srcOrg, mode) {
     var notVis = true; //default visibility to no
     var targOrg = 0; //default target org to 0
     var visDist = ($(document).width()) / 2;
-    var goodTarg = false; //checks to see if it's a relavent target, depending on mode
+    var goodTarg = false; //checks to see if it's a relevent target, depending on mode
     changeMode(srcOrg);
     mode = allOrgs[srcOrg].state;
     if (mode != 'rand' && allOrgs[srcOrg].type != 'producer') {
@@ -371,6 +371,7 @@ var interact = function(orgInt) {
 };
 
 var adjustTargs = function(oldTargNum) {
+    //function adjusts all targets on the alteration of a target's status (kill)
     console.log('Called adjustTargs for: ', oldTargNum)
     for (var m = 0; m < allOrgs.length; m++) {
         if (allOrgs[m].currTarg > oldTargNum) {

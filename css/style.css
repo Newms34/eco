@@ -31,6 +31,9 @@ html,body{
 	animation:none;
 	-webkit-animation:none;
 }
+.beastie:hover{
+	transform:scale(2,2);
+}
 .skrHi{
 	background-color: #ccf;
 }
